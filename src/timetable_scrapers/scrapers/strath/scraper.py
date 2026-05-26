@@ -5,7 +5,7 @@ from openpyxl import load_workbook
 from ...base.scraper import BaseTimetableScraper
 from ...registry import ScraperRegistry
 from ...schemas import CourseEntry
-from ...utils.time_parser import parse_exam_datetime
+from ...utils.time_parser import parse_exam_datetime, calculate_duration
 
 
 @ScraperRegistry.register("strath")
@@ -109,11 +109,13 @@ class StrathScraper(BaseTimetableScraper):
                         end_iso = ""
                         if "-" in current_time:
                             time_parts = current_time.split("-", 1)
-                            start_iso = parse_exam_datetime(current_date, time_parts[0].strip(), self.timezone)
-                            end_iso = parse_exam_datetime(current_date, time_parts[1].strip(), self.timezone)
+                            start_iso = parse_exam_datetime(current_date, time_parts[0].strip())
+                            end_iso = parse_exam_datetime(current_date, time_parts[1].strip())
 
                         if not start_iso or not end_iso:
                             continue
+
+                        hrs = calculate_duration(start_iso, end_iso)
 
                         all_courses.append(CourseEntry(
                             course_code=course_code,
@@ -121,6 +123,7 @@ class StrathScraper(BaseTimetableScraper):
                             end_time=end_iso,
                             venue=current_venue or "TBA",
                             coordinator=current_lecturer,
+                            hrs=str(hrs),
                             raw_data={
                                 "course_name": course_parts[1].strip() if len(course_parts) > 1 else "",
                                 "group": current_group,

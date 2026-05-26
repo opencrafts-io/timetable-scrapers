@@ -130,12 +130,14 @@ class NursingExamScraper(BaseTimetableScraper):
             day_val = str(column_data_dict["Day"][i] or "")
             suffix = "_Afternoon" if "_Afternoon" in time_key else ""
 
-            start_time = parse_exam_datetime(day_val, start_time_str, self.timezone)
-            end_time = parse_exam_datetime(day_val, end_time_str, self.timezone)
+            start_time = parse_exam_datetime(day_val, start_time_str)
+            end_time = parse_exam_datetime(day_val, end_time_str)
 
             if not start_time or not end_time:
                 self.logger.warning(f"Failed to parse datetime for {course_code} on {day_val}")
                 continue
+
+            hrs = calculate_duration(start_time, end_time)
 
             course_info = CourseEntry(
                 course_code=course_code,
@@ -143,7 +145,7 @@ class NursingExamScraper(BaseTimetableScraper):
                 end_time=end_time,
                 venue=str(column_data_dict.get(f"Venue{suffix}", [""] * (i + 1))[i] or "").strip(),
                 coordinator=str(column_data_dict.get("Coordinator", [""] * (i + 1))[i] or "").strip(),
-                hrs=str(column_data_dict.get(f"Hours{suffix}", [""] * (i + 1))[i] or "").strip(),
+                hrs=str(hrs),
                 raw_data={
                     "original_day": day_val,
                     "campus": column_data_dict.get("Campus", [""] * (i + 1))[i],

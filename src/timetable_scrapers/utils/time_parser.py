@@ -1,7 +1,5 @@
 from datetime import datetime
-from dateutil import parser as date_parser
-from dateutil.tz import UTC
-from typing import Optional, Tuple
+from typing import Tuple
 import logging
 
 from ..schemas import CourseEntry
@@ -12,13 +10,15 @@ logger = logging.getLogger(__name__)
 def parse_exam_datetime(
     day_str: str,
     time_str: str,
-    timezone_str: str = "UTC"
 ) -> str:
     """
-    Convert day and time strings to ISO 8601 UTC format.
+    Convert day and time strings to ISO 8601 format with Z suffix.
+
+    Parses the local time as-is (no timezone conversion) and appends 'Z'.
+    Handles day strings like "MONDAY 20/04/26", "2026-04-20", "20/04/26", etc.
 
     Returns:
-        ISO 8601 UTC datetime string (e.g., "2026-04-28T08:00:00Z")
+        ISO 8601 datetime string (e.g., "2026-04-20T09:00:00Z")
         Returns empty string if parsing fails.
     """
     if not day_str or not time_str:
@@ -26,10 +26,11 @@ def parse_exam_datetime(
         return ""
 
     try:
-       # "WEDN 29/4/26" -> "29/4/26")
         clean_day = str(day_str).upper().strip()
-        day_prefixes = ["WEDNESDAY", "THURSDAY", "SATURDAY", "MONDAY", "TUESDAY", "FRIDAY", "SUNDAY",
-                        "THURS", "WEDN", "WED", "THU", "MON", "TUE", "FRI", "SAT", "SUN"]
+        day_prefixes = [
+            "WEDNESDAY", "THURSDAY", "SATURDAY", "MONDAY", "TUESDAY", "FRIDAY", "SUNDAY",
+            "THURS", "WEDN", "WED", "THU", "MON", "TUE", "FRI", "SAT", "SUN",
+        ]
         for prefix in day_prefixes:
             if clean_day.startswith(prefix):
                 remaining = clean_day[len(prefix):].strip()
@@ -37,29 +38,49 @@ def parse_exam_datetime(
                     clean_day = remaining
                     break
 
-        day_obj = date_parser.parse(clean_day, dayfirst=True)
-
-        time_str = str(time_str).replace('.', ':').replace(' ', '').upper()
-
-        try:
-            time_obj = datetime.strptime(time_str, "%I:%M%p").time()
-        except ValueError:
+        day_formats = [
+            "%d/%m/%y",   # 20/04/26
+            "%d/%m/%Y",   # 20/04/2026
+            "%Y-%m-%d",   # 2026-04-20
+            "%d-%m-%Y",   # 20-04-2026
+            "%d-%m-%y",   # 20-04-26
+            "%d %b %Y",   # 20 Apr 2026
+            "%d %B %Y",   # 20 April 2026
+        ]
+        day_obj = None
+        for fmt in day_formats:
             try:
-                time_obj = datetime.strptime(time_str, "%H:%M").time()
+                day_obj = datetime.strptime(clean_day, fmt)
+                break
             except ValueError:
-                time_obj = datetime.strptime(time_str, "%H%M").time()
+                continue
+
+        if not day_obj:
+            logger.warning(f"Unable to parse day: '{day_str}' (cleaned: '{clean_day}')")
+            return ""
+
+        time_clean = str(time_str).replace('.', ':').replace(' ', '').upper()
+
+        # Try multiple time formats
+        time_formats = [
+            "%I:%M%p",  # 9:00AM, 11:00PM
+            "%I%p",     # 9AM
+            "%H:%M",    # 14:00
+            "%H%M",     # 1400
+        ]
+        time_obj = None
+        for tfmt in time_formats:
+            try:
+                time_obj = datetime.strptime(time_clean, tfmt).time()
+                break
+            except ValueError:
+                continue
+
+        if not time_obj:
+            logger.warning(f"Unable to parse time: '{time_str}' (cleaned: '{time_clean}')")
+            return ""
 
         dt = datetime.combine(day_obj.date(), time_obj)
-
-        try:
-            from dateutil import tz as dateutil_tz
-            tz_obj = dateutil_tz.gettz(timezone_str) or UTC
-            dt = dt.replace(tzinfo=tz_obj).astimezone(UTC)
-        except Exception as e:
-            logger.warning(f"Timezone parsing failed for {timezone_str}: {e}")
-            dt = dt.replace(tzinfo=UTC)
-
-        # Return ISO 8601 UTC format
         return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     except Exception as e:
@@ -86,10 +107,7 @@ def calculate_duration(start_iso: str, end_iso: str) -> str:
 
         hours = total_seconds / 3600
 
-        if hours == int(hours):
-            return f"{int(hours)} hour{'s' if hours != 1 else ''}"
-        else:
-            return f"{hours:.1f} hours"
+        return str(hours)
 
     except Exception as e:
         logger.warning(f"Failed to calculate duration: {e}")

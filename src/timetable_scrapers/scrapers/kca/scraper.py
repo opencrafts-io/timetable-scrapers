@@ -6,7 +6,7 @@ from openpyxl import load_workbook
 from ...base.scraper import BaseTimetableScraper
 from ...registry import ScraperRegistry
 from ...schemas import CourseEntry
-from ...utils.time_parser import parse_exam_datetime
+from ...utils.time_parser import parse_exam_datetime, calculate_duration
 
 
 @ScraperRegistry.register("kca")
@@ -141,11 +141,13 @@ class KCAScraper(BaseTimetableScraper):
                 end_iso = ""
                 if "-" in time_range_str:
                     time_parts = time_range_str.split("-", 1)
-                    start_iso = parse_exam_datetime(date_val, time_parts[0].strip(), self.timezone)
-                    end_iso = parse_exam_datetime(date_val, time_parts[1].strip(), self.timezone)
+                    start_iso = parse_exam_datetime(date_val, time_parts[0].strip())
+                    end_iso = parse_exam_datetime(date_val, time_parts[1].strip())
 
                 if not start_iso or not end_iso:
                     continue
+
+                hrs = calculate_duration(start_iso, end_iso)
 
                 all_courses.append(CourseEntry(
                     course_code=unit_code,
@@ -153,6 +155,7 @@ class KCAScraper(BaseTimetableScraper):
                     end_time=end_iso,
                     venue=venue_val or "TBA",
                     coordinator=coordinator_val,
+                    hrs=str(hrs),
                     raw_data=raw_data,
                 ))
 

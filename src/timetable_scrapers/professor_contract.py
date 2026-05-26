@@ -1,4 +1,4 @@
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional
 import logging
 import requests
 
@@ -23,8 +23,7 @@ def get_institution_id(scraper_name: str) -> str:
     if institution_id is None:
         available = ", ".join(sorted(INSTITUTION_ID_MAP.keys()))
         raise ValueError(
-            f"Unknown scraper name: '{scraper_name}'. "
-            f"Available scrapers: {available}"
+            f"Unknown scraper name: '{scraper_name}'. Available scrapers: {available}"
         )
     return institution_id
 
@@ -69,7 +68,7 @@ def build_ingest_payload(
     # Chunk if necessary
     payloads = []
     for i in range(0, len(items), chunk_size):
-        chunk = items[i:i + chunk_size]
+        chunk = items[i : i + chunk_size]
         payload = {
             "institution_id": institution_id,
             "semester_id": semester_id,
@@ -95,7 +94,9 @@ def send_to_professor(
 
     for idx, payload in enumerate(payloads):
         try:
-            logger.info(f"Sending payload {idx + 1}/{len(payloads)} ({len(payload['items'])} items)")
+            logger.info(
+                f"Sending payload {idx + 1}/{len(payloads)} ({len(payload['items'])} items)"
+            )
 
             response = requests.post(
                 api_url,

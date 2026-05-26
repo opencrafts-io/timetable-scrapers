@@ -5,7 +5,7 @@ from openpyxl import load_workbook
 from ...base.scraper import BaseTimetableScraper
 from ...registry import ScraperRegistry
 from ...schemas import CourseEntry
-from ...utils.time_parser import parse_exam_datetime
+from ...utils.time_parser import parse_exam_datetime, calculate_duration
 
 
 @ScraperRegistry.register("school_exams")
@@ -87,11 +87,13 @@ class SchoolExamScraper(BaseTimetableScraper):
                         end_iso = ""
                         if "-" in course_time_range:
                             time_parts = course_time_range.split("-", 1)
-                            start_iso = parse_exam_datetime(day, time_parts[0].strip(), self.timezone)
-                            end_iso = parse_exam_datetime(day, time_parts[1].strip(), self.timezone)
+                            start_iso = parse_exam_datetime(day, time_parts[0].strip())
+                            end_iso = parse_exam_datetime(day, time_parts[1].strip())
 
                         if not start_iso or not end_iso:
                             continue
+
+                        hrs = calculate_duration(start_iso, end_iso)
 
                         courses.append(
                             CourseEntry(
@@ -99,6 +101,7 @@ class SchoolExamScraper(BaseTimetableScraper):
                                 start_time=start_iso,
                                 end_time=end_iso,
                                 venue=str(rooms.get(f"{idx}", "")).strip() or "TBA",
+                                hrs=str(hrs),
                                 raw_data={
                                     "original_day": day,
                                     "original_time": course_time_range,
