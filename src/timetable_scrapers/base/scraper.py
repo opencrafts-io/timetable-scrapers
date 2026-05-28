@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import BinaryIO, List, Union, Optional
+from typing import BinaryIO, List, Union
 import logging
 
 from ..schemas import CourseEntry

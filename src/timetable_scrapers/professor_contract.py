@@ -3,14 +3,13 @@ import logging
 import requests
 
 from .schemas import CourseEntry
-
+from datetime import datetime
 logger = logging.getLogger(__name__)
 
 INSTITUTION_ID_MAP: Dict[str, str] = {
     "kca": "123",
     "strath": "5461",
     "nursing_exams": "5426",
-    "school_exams": "5426",
     "daystar": "5426",
 }
 
@@ -28,10 +27,27 @@ def get_institution_id(scraper_name: str) -> str:
     return institution_id
 
 
+def get_semester(dt: Optional[datetime] = None) -> str:
+    """
+    Generate semester string based on month.
+    Jan-Apr -> Jan, May-Aug -> May, Sept-Dec -> Sept
+    Appends 2-digit year.
+    """
+    if dt is None:
+        dt = datetime.now()
+    year_suffix = str(dt.year)[-2:]
+    month = dt.month
+    if month <= 4:
+        return f"Jan{year_suffix}"
+    elif month <= 8:
+        return f"May{year_suffix}"
+    else:
+        return f"Sept{year_suffix}"
+
+
 def build_ingest_payload(
-    institution_id: str,
+    scraper_name: str,
     entries: Iterable[CourseEntry],
-    semester_id: Optional[int] = None,
     chunk_size: int = 5000,
 ) -> List[Dict[str, Any]]:
     """
@@ -42,8 +58,8 @@ def build_ingest_payload(
         - Chunks large batches if needed
         - Preserves last-write-wins for duplicates
     """
-    if not institution_id:
-        raise ValueError("institution_id is required")
+    institution_id = get_institution_id(scraper_name)
+    current_semester = get_semester()
 
     entries_list = list(entries)
     if not entries_list:
@@ -53,7 +69,7 @@ def build_ingest_payload(
     # Deduplicate entries (last-wins policy)
     deduplicated = {}
     for entry in entries_list:
-        key = (institution_id, semester_id, entry.course_code)
+        key = (institution_id, current_semester, entry.course_code)
         deduplicated[key] = entry
 
     if len(deduplicated) < len(entries_list):
@@ -63,70 +79,34 @@ def build_ingest_payload(
         )
 
     # Convert to dictionaries
-    items = [entry.to_dict() for entry in deduplicated.values()]
+    items = []
+    for entry in deduplicated.values():
+        d = entry.to_dict()
+        
+        # Validation based on data contract
+        if not d.get("course_code"):
+            raise ValueError(f"course_code is required and cannot be empty. Got: {d}")
+        if not d.get("start_time"):
+            raise ValueError(f"start_time is required. Got: {d}")
+        if not d.get("end_time"):
+            raise ValueError(f"end_time is required. Got: {d}")
+        if not d.get("venue"):
+            raise ValueError(f"venue is required and cannot be empty. Got: {d}")
+        if not d.get("hrs"):
+            raise ValueError(f"hrs is required. Got: {d}")
+            
+        d["institution_id"] = institution_id
+        d["semester"] = current_semester
+        items.append(d)
 
     # Chunk if necessary
     payloads = []
     for i in range(0, len(items), chunk_size):
         chunk = items[i : i + chunk_size]
         payload = {
-            "institution_id": institution_id,
-            "semester_id": semester_id,
             "items": chunk,
         }
         payloads.append(payload)
         logger.info(f"Built payload with {len(chunk)} items")
 
     return payloads
-
-
-def send_to_professor(
-    payloads: List[Dict[str, Any]],
-    api_url: str,
-    api_token: str,
-) -> Dict[str, Any]:
-    """
-    Send ingest payloads to Professor API.
-    """
-    total_created = 0
-    total_updated = 0
-    errors = []
-
-    for idx, payload in enumerate(payloads):
-        try:
-            logger.info(
-                f"Sending payload {idx + 1}/{len(payloads)} ({len(payload['items'])} items)"
-            )
-
-            response = requests.post(
-                api_url,
-                json=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {api_token}",
-                },
-                timeout=30,
-            )
-
-            response.raise_for_status()
-
-            result = response.json()
-            total_created += result.get("created_count", 0)
-            total_updated += result.get("updated_count", 0)
-
-            logger.info(
-                f"Payload {idx + 1}: Created {result.get('created_count', 0)}, "
-                f"Updated {result.get('updated_count', 0)}"
-            )
-
-        except requests.exceptions.RequestException as e:
-            error_msg = f"Payload {idx + 1}: {str(e)}"
-            logger.error(error_msg)
-            errors.append(error_msg)
-
-    return {
-        "total_created": total_created,
-        "total_updated": total_updated,
-        "payloads_sent": len(payloads),
-        "errors": errors,
-    }

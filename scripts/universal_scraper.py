@@ -21,7 +21,10 @@ def main():
         description="Extract University Exam Schedules using a scraper."
     )
 
-    parser.add_argument("scraper_name", help="Name of the scraper to use")
+    parser.add_argument(
+        "scraper_name",
+        help=f"Name of the scraper to use {ScraperRegistry.list_scrapers()}",
+    )
 
     parser.add_argument("input_file", help="Path to the Excel file")
 
@@ -66,12 +69,23 @@ def main():
 
     print(f"Extracted {len(entries)}")
 
-    items = [entry.to_dict() for entry in entries]
+    try:
+        from timetable_scrapers.professor_contract import build_ingest_payload
+        payloads = build_ingest_payload(scraper_name, entries, chunk_size=1000000)
+        
+        all_items = []
+        for p in payloads:
+            all_items.extend(p["items"])
+            
+        final_output = {"items": all_items}
+    except Exception as e:
+        print(f"Error building payload: {e}")
+        sys.exit(1)
 
     print(f"Saving to: {output_file}")
 
     with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(items, f, indent=4, ensure_ascii=False)
+        json.dump(final_output, f, indent=4, ensure_ascii=False)
 
     print("Success")
 

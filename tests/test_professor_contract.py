@@ -173,7 +173,7 @@ def test_get_institution_id_mapping():
     assert get_institution_id("kca") == "123"
     assert get_institution_id("strath") == "456"
     assert get_institution_id("nursing_exams") == "789"
-    assert get_institution_id("school_exams") == "789"
+    assert get_institution_id("daystar") == "789"
 
 
 def test_get_institution_id_unknown_scraper():

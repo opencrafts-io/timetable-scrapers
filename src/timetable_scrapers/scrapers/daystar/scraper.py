@@ -8,7 +8,7 @@ from ...schemas import CourseEntry
 from ...utils.time_parser import parse_exam_datetime, calculate_duration
 
 
-@ScraperRegistry.register("school_exams")
+@ScraperRegistry.register("daystar")
 class SchoolExamScraper(BaseTimetableScraper):
     """
     Scraper for Daystar University Exams.

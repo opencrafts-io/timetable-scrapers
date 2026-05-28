@@ -6,7 +6,7 @@ with open("final_april_2026_v2.json", "r") as f:
 
 if isinstance(data, list):
     items = data
-    institution_id = "5426"  # Default for school_exams based on professor_contract.py
+    institution_id = "5426"  # Default for Daystar based on professor_contract.py
     print("Notice: Input file is a simple list. Wrapping with default institution_id.")
 else:
     institution_id = data.get("institution_id", "")
