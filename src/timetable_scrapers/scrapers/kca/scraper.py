@@ -141,8 +141,8 @@ class KCAScraper(BaseTimetableScraper):
                 end_iso = ""
                 if "-" in time_range_str:
                     time_parts = time_range_str.split("-", 1)
-                    start_iso = parse_exam_datetime(date_val, time_parts[0].strip())
-                    end_iso = parse_exam_datetime(date_val, time_parts[1].strip())
+                    start_iso = parse_exam_datetime(date_val, time_parts[0].strip(), self.timezone)
+                    end_iso = parse_exam_datetime(date_val, time_parts[1].strip(), self.timezone)
 
                 if not start_iso or not end_iso:
                     continue

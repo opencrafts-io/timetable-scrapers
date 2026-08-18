@@ -109,8 +109,8 @@ class StrathScraper(BaseTimetableScraper):
                         end_iso = ""
                         if "-" in current_time:
                             time_parts = current_time.split("-", 1)
-                            start_iso = parse_exam_datetime(current_date, time_parts[0].strip())
-                            end_iso = parse_exam_datetime(current_date, time_parts[1].strip())
+                            start_iso = parse_exam_datetime(current_date, time_parts[0].strip(), self.timezone)
+                            end_iso = parse_exam_datetime(current_date, time_parts[1].strip(), self.timezone)
 
                         if not start_iso or not end_iso:
                             continue

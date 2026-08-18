@@ -1,4 +1,5 @@
-from datetime import datetime
+import re
+from datetime import datetime, timedelta
 from typing import Tuple
 import logging
 
@@ -6,19 +7,27 @@ from ..schemas import CourseEntry
 
 logger = logging.getLogger(__name__)
 
+# Static offsets; none of these institutions' timezones observe DST.
+TIMEZONE_OFFSETS_HOURS = {
+    "UTC": 0,
+    "EAT": 3,  # East Africa Time
+}
+
 
 def parse_exam_datetime(
     day_str: str,
     time_str: str,
+    timezone_str: str = "UTC",
 ) -> str:
     """
-    Convert day and time strings to ISO 8601 format with Z suffix.
+    Convert day and time strings to ISO 8601 UTC format.
 
-    Parses the local time as-is (no timezone conversion) and appends 'Z'.
+    Interprets day_str/time_str as local time in `timezone_str` and converts
+    to UTC before appending the 'Z' suffix.
     Handles day strings like "MONDAY 20/04/26", "2026-04-20", "20/04/26", etc.
 
     Returns:
-        ISO 8601 datetime string (e.g., "2026-04-20T09:00:00Z")
+        ISO 8601 UTC datetime string (e.g., "2026-04-20T09:00:00Z")
         Returns empty string if parsing fails.
     """
     if not day_str or not time_str:
@@ -34,9 +43,13 @@ def parse_exam_datetime(
         for prefix in day_prefixes:
             if clean_day.startswith(prefix):
                 remaining = clean_day[len(prefix):].strip()
-                if not remaining or remaining[0].isdigit() or remaining[0] in " /-":
+                if not remaining or remaining[0].isdigit() or remaining[0] in " /-, ":
                     clean_day = remaining
                     break
+
+        clean_day = clean_day.lstrip(", ").strip()
+        clean_day = re.sub(r'(\d+)(ST|ND|RD|TH)\b', r'\1', clean_day)
+        clean_day = re.sub(r'\s+', ' ', clean_day).strip()
 
         day_formats = [
             "%d/%m/%y",   # 20/04/26
@@ -80,8 +93,14 @@ def parse_exam_datetime(
             logger.warning(f"Unable to parse time: '{time_str}' (cleaned: '{time_clean}')")
             return ""
 
-        dt = datetime.combine(day_obj.date(), time_obj)
-        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        offset_hours = TIMEZONE_OFFSETS_HOURS.get(timezone_str.upper())
+        if offset_hours is None:
+            logger.warning(f"Unknown timezone '{timezone_str}', treating as UTC")
+            offset_hours = 0
+
+        local_dt = datetime.combine(day_obj.date(), time_obj)
+        utc_dt = local_dt - timedelta(hours=offset_hours)
+        return utc_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     except Exception as e:
         logger.warning(f"Failed to parse datetime: day={day_str}, time={time_str}: {e}")

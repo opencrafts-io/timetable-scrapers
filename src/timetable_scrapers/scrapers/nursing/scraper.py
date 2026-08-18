@@ -130,8 +130,8 @@ class NursingExamScraper(BaseTimetableScraper):
             day_val = str(column_data_dict["Day"][i] or "")
             suffix = "_Afternoon" if "_Afternoon" in time_key else ""
 
-            start_time = parse_exam_datetime(day_val, start_time_str)
-            end_time = parse_exam_datetime(day_val, end_time_str)
+            start_time = parse_exam_datetime(day_val, start_time_str, self.timezone)
+            end_time = parse_exam_datetime(day_val, end_time_str, self.timezone)
 
             if not start_time or not end_time:
                 self.logger.warning(f"Failed to parse datetime for {course_code} on {day_val}")
