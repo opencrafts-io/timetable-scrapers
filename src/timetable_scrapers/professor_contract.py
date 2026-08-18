@@ -95,7 +95,7 @@ def build_ingest_payload(
         if not d.get("hrs"):
             raise ValueError(f"hrs is required. Got: {d}")
             
-        d["institution_id"] = institution_id
+        d["institution"] = institution_id
         d["semester"] = current_semester
         items.append(d)
 
