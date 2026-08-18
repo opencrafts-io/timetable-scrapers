@@ -1,9 +1,19 @@
 from abc import ABC, abstractmethod
-from typing import BinaryIO, List, Union
+from typing import Any, BinaryIO, List, Union
 import logging
+import re
 
 from ..schemas import CourseEntry
 from ..utils.time_parser import validate_entry
+
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def _clean_text(value: Any) -> Any:
+    """Collapse embedded newlines/whitespace runs (e.g. from wrapped Excel cells) to a single space."""
+    if not isinstance(value, str):
+        return value
+    return _WHITESPACE_RE.sub(" ", value).strip()
 
 
 class BaseTimetableScraper(ABC):
@@ -59,4 +69,9 @@ class BaseTimetableScraper(ABC):
         """
         Applies validation and any normalization.
         """
+        for entry in entries:
+            entry.course_code = _clean_text(entry.course_code)
+            entry.venue = _clean_text(entry.venue)
+            entry.coordinator = _clean_text(entry.coordinator)
+            entry.raw_data = {k: _clean_text(v) for k, v in entry.raw_data.items()}
         return [entry for entry in entries if self.validate_entry(entry)]
