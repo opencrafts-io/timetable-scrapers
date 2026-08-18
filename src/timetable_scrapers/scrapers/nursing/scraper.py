@@ -1,10 +1,11 @@
-from typing import Any, Dict, List
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 from openpyxl import load_workbook
 
 from ...base.scraper import BaseTimetableScraper
 from ...registry import ScraperRegistry
 from ...schemas import CourseEntry
-from ...utils.time_parser import parse_exam_datetime
+from ...utils.time_parser import calculate_duration, parse_exam_datetime
 
 
 @ScraperRegistry.register("nursing_exams")
@@ -139,6 +140,14 @@ class NursingExamScraper(BaseTimetableScraper):
 
             hrs = calculate_duration(start_time, end_time)
 
+            sheet_hours = self._parse_sheet_hours(
+                column_data_dict.get(f"Hours{suffix}", [None] * (i + 1))[i]
+            )
+            if sheet_hours is not None and hrs and 0 < sheet_hours <= float(hrs):
+                # Exam starts on schedule; only the end time shortens to match the sheet.
+                end_time = self._shorten_end_time(start_time, sheet_hours)
+                hrs = calculate_duration(start_time, end_time)
+
             course_info = CourseEntry(
                 course_code=course_code,
                 start_time=start_time,
@@ -155,3 +164,18 @@ class NursingExamScraper(BaseTimetableScraper):
 
             courses.append(course_info)
         return courses
+
+    @staticmethod
+    def _parse_sheet_hours(raw_value: Any) -> Optional[float]:
+        if raw_value is None:
+            return None
+        try:
+            return float(str(raw_value).strip())
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _shorten_end_time(start_iso: str, hours: float) -> str:
+        start_dt = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
+        end_dt = start_dt + timedelta(hours=hours)
+        return end_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
